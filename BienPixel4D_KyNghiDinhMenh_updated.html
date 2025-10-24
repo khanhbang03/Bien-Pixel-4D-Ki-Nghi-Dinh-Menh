@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="vi"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Biển Pixel 4D – Kỳ Nghỉ Định Mệnh (Cập nhật)</title>
+<style>
+  :root{--bg-day:#87ceeb;--sea:#056b9a;--sand:#f7d488;--panel:#071022}
+  html,body{height:100%;margin:0;background:var(--panel);font-family:Inter,system-ui,Arial;color:#fff}
+  .wrap{max-width:1200px;margin:12px auto;padding:12px}
+  header{display:flex;align-items:center;gap:12px}
+  h1{font-size:18px;margin:0}
+  .controls{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+  button{background:#fff;color:#111;border-radius:8px;padding:8px 10px;border:none;font-weight:700;cursor:pointer}
+  .stage{margin-top:12px;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#07203a,#011028);height:760px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .particle-layer{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}
+  .flash{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:screen;opacity:0}
+  .time-layer{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;opacity:0}
+  .ui{position:absolute;left:12px;top:12px;z-index:40;display:flex;flex-direction:column;gap:8px}
+  .pill{background:rgba(255,255,255,0.06);backdrop-filter:blur(4px);padding:8px;border-radius:10px}
+  .credits{position:absolute;right:12px;bottom:12px;background:rgba(0,0,0,0.5);padding:8px;border-radius:8px;font-size:13px}
+  .speech{position:absolute;background:rgba(0,0,0,0.75);color:#fff;padding:6px 10px;border-radius:10px;font-size:12px;pointer-events:none;opacity:0;transition:opacity .18s,transform .18s}
+  .daynight-toggle{position:absolute;right:12px;top:12px;z-index:50}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Biển Pixel 4D – Kỳ Nghỉ Định Mệnh (Cập nhật)</h1>
+      <div style="background:#ffcc00;color:#08111a;padding:4px 8px;border-radius:999px;font-weight:800">2D + 4D</div>
+    </header>
+
+    <div class="controls">
+      <button id="play">▶ Chạy</button>
+      <button id="stop">⏹ Dừng</button>
+      <button id="sensory">4D Cảm giác</button>
+      <button id="timewarp">4D Thời-gian</button>
+      <button id="surreal">4D Siêu-tưởng</button>
+      <button id="download">⬇ Tải HTML</button>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="main" width="1200" height="760"></canvas>
+      <div class="particle-layer" id="particles"></div>
+      <div class="flash" id="flash"></div>
+      <div class="time-layer" id="timelayer1" style="width: 1200px; height: 760px;"></div>
+      <div class="time-layer" id="timelayer2" style="width: 1200px; height: 760px;"></div>
+
+      <div class="ui">
+        <div class="pill">Nhân vật: danh sách mở rộng (xem credits)</div>
+        <div class="pill">Bối cảnh: Biển + Hỏa Lò + Nhà của Mrudav (Gym &amp; Haunted) • Lịch: Tháng 10 (ô 10 nổi bật)</div>
+      </div>
+
+      <div class="credits">Kênh: Trương Ngọc Anh Channel</div>
+
+      <!-- speech bubbles container -->
+      <div id="speechContainer"></div>
+
+      <!-- day/night toggle (visual) -->
+      <div class="daynight-toggle"><button id="toggleDayNight">🌇 Chuyển ngày/đêm</button></div>
+    </div>
+  </div>
+
+<script>
+// Updated eBite: add Nguyên Đức Huy + Em Công (watch TV together) and Javokher Khusanov + Azamat Dzholbunov training in Mrudav's Gym/Haunted house
+const canvas = document.getElementById('main'); const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage'); const particlesEl = document.getElementById('particles');
+const flash = document.getElementById('flash'); const tl1 = document.getElementById('timelayer1'); const tl2 = document.getElementById('timelayer2');
+const speechContainer = document.getElementById('speechContainer');
+let W=1200,H=760; function resize(){ const r=stage.getBoundingClientRect(); W=r.width; H=r.height; canvas.width=W; canvas.height=H; tl1.style.width=W+'px'; tl1.style.height=H+'px'; tl2.style.width=W+'px'; tl2.style.height=H+'px'; } window.addEventListener('resize', resize); resize();
+
+let playing=false, sensoryOn=false, timewarpOn=false, surrealOn=false, isNight=false;
+
+// speech bubble helper
+function showSpeech(id, text){ let el = document.getElementById('speech-'+id); if(!el){ el = document.createElement('div'); el.id='speech-'+id; el.className='speech'; speechContainer.appendChild(el); }
+  el.textContent = text; const pos = charPositions[id]; if(pos){ el.style.left = (pos.x+20)+'px'; el.style.top = (pos.y-70)+'px'; el.style.opacity=1; el.style.transform='translateY(-6px)'; setTimeout(()=>{ el.style.opacity=0; el.style.transform='translateY(0)'; },3000); }
+}
+
+// characters extended
+const characters = [
+  {id:'nb', name:'Nguyễn K.Bằng', x:200, color:{body:'#1e90ff',hair:'#3a2b2b'}, speech:'Hẹn gặp lúc hoàng hôn!'},
+  {id:'tpn', name:'Trần P.Nhi', x:360, color:{body:'#ff7eb9',hair:'#5c2a2a'}, speech:'Tôi trôi một cách chuyên nghiệp!'},
+  {id:'tdm', name:'Trần Đ.Mạnh', x:520, color:{body:'#a0c4ff',hair:'#5c4b3a'}, speech:'Cứ chill và chơi thôi!'},
+  {id:'qdt', name:'Quách D.Trường', x:420, color:{body:'#9be564',hair:'#3a3a2b'}, speech:'Ai cười tôi thì mời nước!'},
+  {id:'mrudav', name:'Mrudav P.Mehta', x:860, color:{body:'#f4a261',hair:'#2b2b2b'}, falling:true, fy:-200, vy:0, parachute:false, speech:'View từ trên cao rất đã!'},
+  {id:'nghiem', name:'Nghiêm M.Hiếu', x:980, color:{body:'#c9f38e',hair:'#2b2b2b'}, hasTV:true, speech:'Tin sốc: 10 màn hình đang tải...'},
+  {id:'ali', name:'Ali Akram', x:120, color:{body:'#ffd6a5',hair:'#2b2b2b'}, floatGear:true, speech:'Phao vịt là triết lý sống của tôi!'},
+  {id:'aittaty', name:'Aittaty Kyzybek', x:560, color:{body:'#ffd1dc',hair:'#5c2a2a'}, floatGear:true, speech:'Tôi không bơi, tôi trôi chuyên nghiệp!'},
+  {id:'tad', name:'Tạ Tùng Dương', x:700, color:{body:'#c3f2ff',hair:'#2b2b2b'}, playingCards:true, speech:'LÁ BÀI ĐỊNH MỆNH! Uno hoặc là không gì cả!'},
+  {id:'viet', name:'Việt Đoàn', x:760, color:{body:'#f0c3ff',hair:'#2b2b2b'}, pool:true, speech:'8-ball vô rồi, thách đấu nào!'},
+  {id:'leduy', name:'Lê Duy Đức', x:540, color:{body:'#b7f0a1',hair:'#2b2b2b'}, soda:true, speech:'Không gì giải khát bằng soda 8-bit!'},
+  // new: Huỳ & Em Công watching TV together
+  {id:'huy', name:'Nguyên Đức Huy', x:1020, color:{body:'#8ecae6',hair:'#2b2b2b'}, watchingTV:true, speech:'Công, chương trình này hay quá!'},
+  {id:'cong', name:'Em Công', x:1080, color:{body:'#ffb4a2',hair:'#2b2b2b'}, watchingTV:true, speech:'Đổi kênh đi, tôi mê cảnh bãi biển!'},
+  // gym duo
+  {id:'javokher', name:'Javokher Khusanov', x:300, color:{body:'#ffd6f0',hair:'#2b2b2b'}, gym:true, speech:'Thêm một hiệp nữa!'},
+  {id:'azamat', name:'Azamat Dzholbunov', x:360, color:{body:'#c1f0ff',hair:'#2b2b2b'}, gym:true, speech:'Cơ bắp pixel sắp có!'}
+];
+
+// track drawn positions for speech placement
+const charPositions = {};
+
+// airplane
+let airplane = {x:-300, y:80, vx:220};
+
+// Mrudav's house and haunted house (as blocks on the left)
+function drawMrudavHouse(){ // house block
+  ctx.save(); ctx.fillStyle='#6b4f3b'; ctx.fillRect(60, H*0.5 - 30, 160, 120); ctx.fillStyle='#3a2b2b'; ctx.fillRect(110, H*0.5 + 10, 60, 40); ctx.fillStyle='#fff'; ctx.font='12px monospace'; ctx.fillText('NHÀ MRUDAV', 78, H*0.5 - 40); // haunted annex
+  ctx.fillStyle='#2b2b44'; ctx.fillRect(20, H*0.5 - 80, 80, 60); ctx.fillStyle='#fff'; ctx.fillText('NHÀ MA', 32, H*0.5 - 60);
+  // gym sign
+  ctx.fillStyle='#ffcc00'; ctx.fillRect(90, H*0.5 - 10, 80, 18); ctx.fillStyle='#111'; ctx.fillText('GYM', 120, H*0.5 + 2);
+  ctx.restore(); }
+
+// gym occupants animation (simple weights)
+let gymTimer = 0;
+
+// screens for Nghiêm Minh Hiếu
+let screens = [];
+function initScreens(){ screens=[]; for(let i=0;i<10;i++){ screens.push({x:980 + (Math.random()*200-100), y:180 + Math.random()*220-110, vx:(Math.random()-0.5)*24, vy:(Math.random()-0.5)*24, rot:Math.random()*Math.PI*2}); } }
+initScreens();
+
+// particles
+let particles = [];
+function spawnParticle(){ particles.push({x: Math.random()*W, y: -10, vx: -2 + Math.random()*4, vy: 2+Math.random()*2, life: 100 + Math.random()*100, t:0, type: Math.random()>0.7?'splash':'wind'}); }
+function updateParticles(dt){ particles.forEach(p=>{ p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.t += dt * 60; p.life -= dt*60 }); particles = particles.filter(p=>p.life>0); }
+function paintParticles(){ particlesEl.innerHTML=''; particles.forEach(p=>{ const el = document.createElement('div'); el.style.position='absolute'; el.style.left=(p.x|0)+'px'; el.style.top=(p.y|0)+'px'; el.style.width='6px'; el.style.height='6px'; el.style.background = p.type==='splash' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.25)'; el.style.borderRadius='50%'; el.style.transform='translate(-50%,-50%)'; el.style.filter='blur(0.6px)'; particlesEl.appendChild(el); }); }
+
+// time-layer snapshots
+const snapshotCanvas = document.createElement('canvas'); const snapshotCtx = snapshotCanvas.getContext('2d'); function ensureSnapshot(){ snapshotCanvas.width = canvas.width; snapshotCanvas.height = canvas.height; } ensureSnapshot(); window.addEventListener('resize', ensureSnapshot);
+let snapshots = [];
+function captureSnapshot(){ snapshotCtx.clearRect(0,0,snapshotCanvas.width,snapshotCanvas.height); snapshotCtx.drawImage(canvas,0,0); snapshots.push(snapshotCanvas.toDataURL()); if(snapshots.length>8) snapshots.shift(); }
+function renderTimeLayers(){ tl1.style.backgroundImage = snapshots[snapshots.length-1] ? `url(${snapshots[snapshots.length-1]})` : 'none'; tl1.style.opacity = timewarpOn ? 0.55 : 0; tl2.style.backgroundImage = snapshots[snapshots.length-3] ? `url(${snapshots[Math.max(0,snapshots.length-3)]})` : 'none'; tl2.style.opacity = timewarpOn ? 0.3 : 0; }
+
+// helper draws
+function drawCharacter(x,y,obj){ ctx.save(); ctx.translate(x,y); ctx.imageSmoothingEnabled=false; // head
+ ctx.fillStyle = '#f7d7b7'; ctx.fillRect(-12,-48,24,24); ctx.fillStyle = obj.color.hair; ctx.fillRect(-12,-48,24,6); // body
+ ctx.fillStyle = obj.color.body; ctx.fillRect(-14,-24,28,28); // eyes
+ ctx.fillStyle='#000'; ctx.fillRect(-6,-40,4,4); ctx.fillRect(2,-40,4,4); ctx.fillStyle='#fff'; ctx.font='10px monospace'; const nm = obj.name.length>12? obj.name.split(' ')[0] : obj.name; ctx.fillText(nm, -20, 4); ctx.restore(); }
+function drawAirplane(dt){ airplane.x += airplane.vx * dt; if(airplane.x > W + 300) airplane.x = -400; ctx.save(); ctx.translate(airplane.x, airplane.y); ctx.fillStyle='#ddd'; ctx.fillRect(-40,-10,80,20); ctx.fillRect(-10,-20,6,10); ctx.fillStyle='#999'; ctx.fillRect(30,-6,12,4); ctx.restore(); }
+function drawParachute(x,y){ ctx.save(); ctx.translate(x,y-40); ctx.fillStyle='rgba(255,100,100,0.95)'; ctx.beginPath(); ctx.moveTo(-60,0); ctx.quadraticCurveTo(0,-40,60,0); ctx.closePath(); ctx.fill(); ctx.restore(); }
+function drawPhone(x,y){ ctx.save(); ctx.translate(x,y); ctx.fillStyle='#000'; ctx.fillRect(-6,-14,12,28); ctx.fillStyle='#1ef'; ctx.fillRect(-4,-10,8,20); ctx.restore(); }
+function drawTV(x,y){ ctx.save(); ctx.translate(x,y); ctx.fillStyle='#222'; ctx.fillRect(-36,-22,72,44); ctx.fillStyle='#111'; ctx.fillRect(-32,-18,64,36); ctx.fillStyle='#ffcc00'; ctx.fillRect(-12,-6,24,12); ctx.restore(); }
+
+// surreal pop objects
+let surrealObjects=[]; function spawnSurreal(){ surrealObjects.push({x: Math.random()*W, y: Math.random()*H*0.6, t:0, life:120 + Math.random()*180, id:Math.random()}); }
+
+// visual day-night blend
+function renderSky(t){ const dayTop = [135,206,235]; const nightTop=[8,18,34]; const mix = isNight?1:0; const r = Math.round(dayTop[0]*(1-mix)+nightTop[0]*mix); const g = Math.round(dayTop[1]*(1-mix)+nightTop[1]*mix); const b = Math.round(dayTop[2]*(1-mix)+nightTop[2]*mix); const grad = ctx.createLinearGradient(0,0,0,H*0.6); grad.addColorStop(0,`rgb(${r},${g},${b})`); grad.addColorStop(1,'#2aa0d8'); ctx.fillStyle=grad; ctx.fillRect(0,0,W,H*0.6); }
+
+// main loop
+let last = performance.now(); function loop(now){ const dt=(now-last)/1000; last=now; if(!playing){ requestAnimationFrame(loop); return; }
+  // updates
+  if(sensoryOn){ if(Math.random()<0.8) spawnParticle(); if(Math.random()<0.03) flashWhite(120); }
+  else { if(Math.random()<0.02) spawnParticle(); }
+  updateParticles(dt); paintParticles(); if(surrealOn && Math.random()<0.06) spawnSurreal();
+
+  ctx.clearRect(0,0,W,H);
+  const t = now/1000;
+  renderSky(t);
+  // sun/moon
+  if(!isNight){ ctx.fillStyle='#fff59d'; ctx.beginPath(); ctx.arc(W-140,80,42,0,Math.PI*2); ctx.fill(); } else { ctx.fillStyle='#f0f5ff'; ctx.beginPath(); ctx.arc(W-140,80,32,0,Math.PI*2); ctx.fill(); }
+  // sea
+  ctx.fillStyle='#056b9a'; ctx.fillRect(0,H*0.36,W,H*0.28);
+  // sand
+  ctx.fillStyle='#f7d488'; ctx.fillRect(0,H*0.64,W,H*0.36);
+  // waves
+  for(let i=0;i<8;i++){ ctx.fillStyle='rgba(255,255,255,'+ (0.06 + 0.02*Math.sin(t*2+i))+')'; ctx.fillRect((i*60 + (t*30%60))%W,H*0.46,120,6); }
+  // Hoa Lo
+  ctx.fillStyle='#8b5a3c'; ctx.fillRect(40,H*0.44 - 60,220,120); ctx.fillStyle='#2b2b2b'; ctx.fillRect(120,H*0.44 - 30,60,60); ctx.fillStyle='#e6eef8'; ctx.font='16px monospace'; ctx.fillText('HỎA LÒ', 80, H*0.44 - 36);
+  // calendar
+  ctx.fillStyle='#fff'; ctx.fillRect(W-160,20,120,120); ctx.fillStyle='#d33'; ctx.font='26px monospace'; ctx.fillText('OCT', W-140, 56);
+
+  // Mrudav's house + gym
+  drawMrudavHouse();
+  gymTimer += dt;
+
+  // airplane and Mrudav falling
+  drawAirplane(dt);
+  const mr = characters.find(c=>c.id==='mrudav');
+  if(airplane.x > 120 && airplane.x < 200 && !mr.fallingStarted){ mr.fallingStarted = true; mr.fy = airplane.y + 24; mr.vy = 0; mr.parachuteOpenAt = performance.now() + 800; }
+  if(mr.fallingStarted){ mr.vy += 600 * dt; mr.fy += mr.vy * dt; if(performance.now() > mr.parachuteOpenAt){ mr.parachute = true; mr.vy *= 0.45; }
+    const groundY = H*0.64 - 40; if(mr.fy >= groundY){ mr.fy = groundY; mr.vy = 0; mr.fallingStarted=false; mr.landed=true; }
+    drawCharacter(mr.x, mr.fy, mr);
+    if(mr.parachute) drawParachute(mr.x, mr.fy);
+  }
+
+  // draw characters and store positions
+  let baseY = H*0.64 - 40;
+  characters.forEach((c,idx)=>{
+    if(c.id==='mrudav') return;
+    let y = baseY + Math.sin(t*2 + idx)*4;
+
+    // special: gym characters (Javokher & Azamat) train inside Mrudav's house area
+    if(c.gym){ // animate simple weight lift
+      const gymX = 100 + (c.id==='javokher'?30:60); const gymY = H*0.5 + 10;
+      drawCharacter(gymX, gymY, c);
+      // dumbbell
+      ctx.save(); ctx.translate(gymX+18, gymY-6); ctx.fillStyle='#222'; ctx.fillRect(-14,-4,28,8); ctx.fillStyle='#ffcc00'; ctx.fillRect(-6,-2,12,4); ctx.restore();
+      charPositions[c.id] = {x:gymX,y:gymY};
+      return;
+    }
+
+    // special: watching TV together (Huy & Cong)
+    if(c.watchingTV){ const tvX = 1020; const tvY = H*0.64 - 40; // draw TV pair area
+      drawCharacter(c.x, tvY, c); // if c is 'huy' or 'cong' we draw TV once
+      drawTV(1000, tvY-6);
+      // position stored
+      charPositions[c.id] = {x:c.x,y:tvY};
+      return;
+    }
+
+    // Nghiêm Minh Hiếu: screens
+    if(c.hasTV){ drawCharacter(c.x, y, c); drawTV(c.x-60, y-10); if(surrealOn){ screens.forEach(s=>{ s.x += s.vx * dt * 60; s.y += s.vy * dt * 60; s.rot += dt * 1.2; if(s.x < 0) s.x = W; if(s.x > W) s.x = 0; if(s.y < 0) s.y = H*0.6; if(s.y > H*0.8) s.y = 0; ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.sin(s.rot)*0.2); ctx.fillStyle='rgba(0,0,0,0.9)'; ctx.fillRect(-20,-12,40,24); ctx.fillStyle='#0ff'; ctx.fillRect(-16,-8,32,16); ctx.restore(); }); }
+      charPositions[c.id] = {x:c.x,y:y};
+      return; }
+
+    // float gear
+    drawCharacter(c.x, y, c);
+    if(c.floatGear){ ctx.save(); ctx.translate(c.x+22, y-6); ctx.fillStyle='#ffd24d'; ctx.beginPath(); ctx.ellipse(0,0,12,8,0,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    if(c.playingCards){ ctx.save(); ctx.translate(c.x+18, y-10); ctx.fillStyle='#fff'; ctx.fillRect(-8,-6,16,12); ctx.fillStyle='#d33'; ctx.fillRect(-6,-3,12,6); ctx.restore(); }
+    if(c.pool){ ctx.save(); ctx.translate(c.x+24, y+6); ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#ffcc00'; ctx.fillRect(-6,-4,12,8); ctx.restore(); }
+    if(c.soda){ ctx.save(); ctx.translate(c.x+20, y-6); ctx.fillStyle='#c9f38e'; ctx.fillRect(-6,-10,12,20); ctx.fillStyle='#fff'; ctx.fillRect(-4,-6,8,12); ctx.restore(); }
+
+    charPositions[c.id] = {x:c.x,y:y};
+  });
+
+  // gym vignette: draw Mrudav's haunted gym interior elements (simple)
+  ctx.save(); ctx.translate(100, H*0.5 + 6); ctx.fillStyle='rgba(255,255,255,0.03)'; ctx.fillRect(-20,-12,140,60); ctx.restore();
+
+  // surreal objects
+  surrealObjects.forEach((o,idx)=>{ o.t+=dt*60; ctx.save(); ctx.translate(o.x, o.y); const s = 1+Math.sin(o.t*0.1)*0.6; ctx.rotate(Math.sin(o.t*0.03)*0.2); ctx.globalAlpha = Math.max(0, Math.min(1, o.life/240)); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(-12*s,-12*s,24*s,24*s); ctx.restore(); o.life -= dt*60; }); surrealObjects = surrealObjects.filter(o=>o.life>0);
+
+  // particles & effects
+  if(timewarpOn && Math.random()<0.15) captureSnapshot(); renderTimeLayers();
+  if(sensoryOn){ applyShake(8); } else if(surrealOn){ applyShake(3); } else { clearShake(); }
+
+  requestAnimationFrame(loop);
+}
+
+// utility: flash
+function flashWhite(ms=120){ flash.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.35))'; flash.style.opacity='1'; flash.style.transition='opacity '+(ms/1000)+'s ease-out'; setTimeout(()=>{ flash.style.opacity='0'; }, 30); setTimeout(()=>{ flash.style.background=''; }, ms+60); }
+function applyShake(intensity){ stage.style.transform = `translate(${(Math.random()-0.5)*intensity}px, ${(Math.random()-0.5)*intensity}px)`; }
+function clearShake(){ stage.style.transform = ''; }
+
+// controls
+document.getElementById('play').onclick = ()=>{ if(!playing){ playing=true; last=performance.now(); loop(last); } };
+document.getElementById('stop').onclick = ()=>{ playing=false; clearShake(); };
+document.getElementById('sensory').onclick = ()=>{ sensoryOn = !sensoryOn; };
+document.getElementById('timewarp').onclick = ()=>{ timewarpOn = !timewarpOn; if(timewarpOn) snapshots=[]; };
+document.getElementById('surreal').onclick = ()=>{ surrealOn = !surrealOn; if(surrealOn) spawnSurreal(); };
+document.getElementById('toggleDayNight').onclick = ()=>{ isNight=!isNight; };
+
+document.getElementById('download').onclick = ()=>{ const html = '<!doctype html>\n' + document.documentElement.outerHTML; const blob = new Blob([html], {type:'text/html'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='BienPixel4D_KyNghiDinhMenh_updated.html'; a.click(); URL.revokeObjectURL(url); };
+
+// click to show speech
+stage.addEventListener('click', (e)=>{
+  const rect = stage.getBoundingClientRect(); const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
+  // nearest character
+  let nearest = null; let md = 1e9; characters.forEach(c=>{ const pos = charPositions[c.id] || {x:c.x,y:H*0.64-40}; const dx = mx - pos.x; const dy = my - pos.y; const d = Math.sqrt(dx*dx+dy*dy); if(d<md){ md=d; nearest=c; } });
+  if(nearest && md < 90){ showSpeech(nearest.id, nearest.speech); }
+});
+
+// initial draw once
+(function init(){ ctx.clearRect(0,0,W,H); const t=0; renderSky(t); ctx.fillStyle='#fff59d'; ctx.beginPath(); ctx.arc(W-140,80,42,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#056b9a'; ctx.fillRect(0,H*0.36,W,H*0.28); ctx.fillStyle='#f7d488'; ctx.fillRect(0,H*0.64,W,H*0.36); ctx.fillStyle='#8b5a3c'; ctx.fillRect(40,H*0.44 - 60,220,120); ctx.fillStyle='#2b2b2b'; ctx.fillRect(120,H*0.44 - 30,60,60); ctx.fillStyle='#e6eef8'; ctx.font='16px monospace'; ctx.fillText('HỎA LÒ', 80, H*0.44 - 36); ctx.fillStyle='#fff'; ctx.fillRect(W-160,20,120,120); ctx.fillStyle='#d33'; ctx.font='26px monospace'; ctx.fillText('OCT', W-140, 56);
+  // draw all characters in their base positions
+  let baseY = H*0.64 - 40; characters.forEach((c,idx)=>{ if(c.gym){ const gymX = 100 + (c.id==='javokher'?30:60); const gymY = H*0.5 + 10; drawCharacter(gymX, gymY, c); charPositions[c.id] = {x:gymX,y:gymY}; return; } if(c.watchingTV){ const tvY = H*0.64 - 40; drawCharacter(c.x, tvY, c); drawTV(1000, tvY-6); charPositions[c.id] = {x:c.x,y:tvY}; return; } drawCharacter(c.x, baseY, c); charPositions[c.id] = {x:c.x,y:baseY}; if(c.floatGear){ ctx.save(); ctx.translate(c.x+22, baseY-6); ctx.fillStyle='#ffd24d'; ctx.beginPath(); ctx.ellipse(0,0,12,8,0,0,Math.PI*2); ctx.fill(); ctx.restore(); } if(c.hasTV){ drawTV(c.x-60, baseY-10); } if(c.playingCards){ ctx.save(); ctx.translate(c.x+18, baseY-10); ctx.fillStyle='#fff'; ctx.fillRect(-8,-6,16,12); ctx.fillStyle='#d33'; ctx.fillRect(-6,-3,12,6); ctx.restore(); } if(c.pool){ ctx.save(); ctx.translate(c.x+24, baseY+6); ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#ffcc00'; ctx.fillRect(-6,-4,12,8); ctx.restore(); } if(c.soda){ ctx.save(); ctx.translate(c.x+20, baseY-6); ctx.fillStyle='#c9f38e'; ctx.fillRect(-6,-10,12,20); ctx.fillStyle='#fff'; ctx.fillRect(-4,-6,8,12); ctx.restore(); } });
+})();
+
+// safety note: non-graphic, playful animations only
+</script>
+
+</body></html>
