@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>eBite — 2D & 4D Multi-mode</title>
+<style>
+  :root{--bg:#0b1220;--panel:#0f1724;--accent:#ffcc00}
+  html,body{height:100%;margin:0;background:var(--bg);color:#e6eef8;font-family:Inter,system-ui,Arial}
+  .wrap{max-width:1100px;margin:14px auto;padding:12px}
+  header{display:flex;align-items:center;gap:12px}
+  h1{font-size:18px;margin:0}
+  .controls{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+  button{background:#fff;color:#111;border-radius:8px;padding:8px 10px;border:none;font-weight:700;cursor:pointer}
+  .stage{margin-top:12px;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#0b2340,#071022);height:640px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .ui{position:absolute;left:12px;top:12px;z-index:40;display:flex;flex-direction:column;gap:8px}
+  .pill{background:rgba(255,255,255,0.06);backdrop-filter:blur(4px);padding:8px;border-radius:10px}
+  .badge{background:var(--accent);color:#08111a;padding:4px 8px;border-radius:999px;font-weight:800}
+  /* visual sensory overlays */
+  .flash{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:screen;opacity:0}
+  .waves{position:absolute;left:0;right:0;bottom:0;height:40%;pointer-events:none}
+  .particle-layer{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}
+  /* time-layers container */
+  .time-layer{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;opacity:0;mix-blend-mode:screen;filter:brightness(0.9) contrast(1.05)}
+  .credits{position:absolute;right:12px;bottom:12px;background:rgba(0,0,0,0.5);padding:8px;border-radius:8px;font-size:13px}
+  /* 2D style */
+  .pixelize{image-rendering:pixelated}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>eBite — Phiên bản 2D & 4D (đa chế độ)</h1>
+      <div class="badge">2D + 4D</div>
+    </header>
+
+    <div class="controls">
+      <button id="mode2d">2D: Pixel Animation</button>
+      <button id="mode4d">4D: Multi-Experience</button>
+      <button id="sensory">4D Cảm giác</button>
+      <button id="timewarp">4D Thời-gian</button>
+      <button id="surreal">4D Siêu-tưởng</button>
+      <button id="play">▶ Chạy</button>
+      <button id="stop">⏹ Dừng</button>
+      <button id="download">⬇ Tải HTML</button>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="main"></canvas>
+      <div class="particle-layer" id="particles"></div>
+      <div class="flash" id="flash"></div>
+      <div class="time-layer" id="timelayer1"></div>
+      <div class="time-layer" id="timelayer2"></div>
+      <div class="ui">
+        <div class="pill">Nhân vật: Nguyễn Khanh Bằng, Trần Phương Nhi, Trần Đức Mạnh, Quách Duy Trường</div>
+        <div class="pill">Bối cảnh: Biển + Hỏa Lò (stylized) • Lịch: Tháng 10 (ô 10 nổi bật)</div>
+      </div>
+      <div class="credits">Kênh: Trương Ngọc Anh Channel</div>
+    </div>
+  </div>
+
+<script>
+/*
+  Single-file eBite implementing:
+  - 2D pixel animation (canvas)
+  - 4D experience with three submodes combined:
+    1) Sensory: screen shake, wind particles, water splashes, binaural-like audio
+    2) Time-warp: layered frames, echo trails, slow/fast playback
+    3) Surreal: objects popping out, repeating clones, looping portals
+  Controls toggle modes; audio uses WebAudio (generated). No external assets needed.
+*/
+
+// Setup
+const canvas = document.getElementById('main');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+const particlesEl = document.getElementById('particles');
+const flash = document.getElementById('flash');
+const tl1 = document.getElementById('timelayer1');
+const tl2 = document.getElementById('timelayer2');
+let W=1200,H=640; function resize(){
+  const r = stage.getBoundingClientRect(); W = r.width; H = r.height; canvas.width = W; canvas.height = H; tl1.style.width = W+'px'; tl1.style.height = H+'px'; tl2.style.width = W+'px'; tl2.style.height = H+'px';
+}
+window.addEventListener('resize', resize); resize();
+
+// State
+let mode = '2d';
+let playing=false;
+let sensoryOn=false,timewarpOn=false,surrealOn=false;
+
+// Simple pixel-art character sprites (drawn procedurally)
+function drawCharacter(x,y,name,color){
+  // body 24x36 pixelish
+  ctx.save(); ctx.translate(x,y);
+  ctx.imageSmoothingEnabled = false;
+  // head
+  ctx.fillStyle = '#f7d7b7'; ctx.fillRect(-12,-48,24,24);
+  // hair
+  ctx.fillStyle = color.hair; ctx.fillRect(-12,-48,24,6);
+  // body
+  ctx.fillStyle = color.body; ctx.fillRect(-14,-24,28,28);
+  // eyes
+  ctx.fillStyle='#000'; ctx.fillRect(-6,-40,4,4); ctx.fillRect(2,-40,4,4);
+  // label
+  ctx.fillStyle='#fff'; ctx.font='10px monospace'; ctx.fillText(name, -20, 4);
+  ctx.restore();
+}
+
+const chars = [
+  {name:'Nguyễn K.Bằng', x:220, z:1, color:{body:'#1e90ff',hair:'#3a2b2b'}},
+  {name:'Trần P.Nhi', x:420, z:1, color:{body:'#ff7eb9',hair:'#5c2a2a'}},
+  {name:'Trần Đ.Mạnh', x:620, z:1, color:{body:'#a0c4ff',hair:'#5c4b3a'}},
+  {name:'Quách D.Trường', x:320, z:1, color:{body:'#9be564',hair:'#3a3a2b'}}
+];
+
+// Simple scene draw (2D pixel beach + small stylized Hoa Lo prison at back-left)
+function drawScene(t){
+  // sky gradient
+  const g = ctx.createLinearGradient(0,0,0,H*0.6); g.addColorStop(0,'#87ceeb'); g.addColorStop(1,'#2aa0d8'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H*0.6);
+  // sun
+  ctx.fillStyle='#fff59d'; ctx.beginPath(); ctx.arc(W-140,80,42,0,Math.PI*2); ctx.fill();
+  // sea
+  ctx.fillStyle='#056b9a'; ctx.fillRect(0,H*0.38,W,H*0.28);
+  // sand
+  ctx.fillStyle='#f7d488'; ctx.fillRect(0,H*0.62,W,H*0.38);
+  // simple waves (pixelized stripes)
+  for(let i=0;i<8;i++){ ctx.fillStyle='rgba(255,255,255,'+ (0.06 + 0.02*Math.sin(t*2+i))+')'; ctx.fillRect((i*60 + (t*30%60))%W,H*0.48,120,6); }
+  // Hoa Lo prison block
+  ctx.fillStyle='#8b5a3c'; ctx.fillRect(40,H*0.45 - 60,220,120);
+  ctx.fillStyle='#2b2b2b'; ctx.fillRect(120,H*0.45 - 30,60,60);
+  ctx.fillStyle='#e6eef8'; ctx.font='16px monospace'; ctx.fillText('HỎA LÒ', 80, H*0.45 - 36);
+  // calendar tile (October) top-right
+  ctx.fillStyle='#fff'; ctx.fillRect(W-160,20,120,120);
+  ctx.fillStyle='#d33'; ctx.font='26px monospace'; ctx.fillText('OCT', W-140, 56);
+  // draw characters
+  chars.forEach((c,idx)=>{ const bob = Math.sin(t*2 + idx)*4; drawCharacter(c.x, H*0.62 - 40 + bob, c.name, c.color); });
+}
+
+// Time-layers capture: render snapshots into canvases for layered effect
+const layerCanvas1 = document.createElement('canvas'); const layerCtx1 = layerCanvas1.getContext('2d');
+const layerCanvas2 = document.createElement('canvas'); const layerCtx2 = layerCanvas2.getContext('2d');
+function ensureLayerSize(){ layerCanvas1.width = layerCanvas2.width = canvas.width; layerCanvas1.height = layerCanvas2.height = canvas.height; }
+ensureLayerSize(); window.addEventListener('resize', ensureLayerSize);
+
+// Particles (wind / rain / splash)
+let particles = [];
+function spawnParticle(){ particles.push({x: Math.random()*W, y: -10, vx: -2 + Math.random()*4, vy: 2+Math.random()*2, life: 100 + Math.random()*100, t:0, type: Math.random()>0.7?'splash':'wind'}); }
+function updateParticles(dt){ particles.forEach(p=>{ p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.t += dt * 60; p.life -= dt*60 }); particles = particles.filter(p=>p.life>0); }
+function paintParticles(){ particlesEl.innerHTML=''; particles.forEach(p=>{ const el = document.createElement('div'); el.style.position='absolute'; el.style.left=(p.x|0)+'px'; el.style.top=(p.y|0)+'px'; el.style.width='6px'; el.style.height='6px'; el.style.background = p.type==='splash' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.25)'; el.style.borderRadius='50%'; el.style.transform='translate(-50%,-50%)'; el.style.filter='blur(0.6px)'; particlesEl.appendChild(el); }); }
+
+// Audio: small ambience + rumble using WebAudio
+const AudioContext = window.AudioContext || window.webkitAudioContext; const audioCtx = new AudioContext();
+const master = audioCtx.createGain(); master.gain.value = 0.0; master.connect(audioCtx.destination);
+function startAmbience(){ if(audioCtx.state==='suspended') audioCtx.resume(); // noise + low rumble
+  // low rumble oscillator
+  const osc = audioCtx.createOscillator(); osc.type='sine'; osc.frequency.value = 40; const g = audioCtx.createGain(); g.gain.value = 0.0; osc.connect(g); g.connect(master); osc.start();
+  // gradual
+  g.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime+0.6);
+  // noise for waves
+  const bufferSize = 2*audioCtx.sampleRate; const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const output = noiseBuffer.getChannelData(0);
+  for (let i=0;i<bufferSize;i++){ output[i] = Math.random()*2-1; }
+  const whiteNoise = audioCtx.createBufferSource(); whiteNoise.buffer = noiseBuffer; const noiseGain = audioCtx.createGain(); noiseGain.gain.value = 0.02; whiteNoise.connect(noiseGain); noiseGain.connect(master); whiteNoise.loop = true; whiteNoise.start();
+  // store refs
+  audioCtx._osc = osc; audioCtx._g = g; audioCtx._noiseGain = noiseGain; audioCtx._noise = whiteNoise;
+}
+function stopAmbience(){ try{ if(audioCtx._g) audioCtx._g.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime+0.3); if(audioCtx._noiseGain) audioCtx._noiseGain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime+0.3);}catch(e){} }
+
+// Screen shake helper
+function applyShake(intensity){ stage.style.transform = `translate(${(Math.random()-0.5)*intensity}px, ${(Math.random()-0.5)*intensity}px)`; }
+function clearShake(){ stage.style.transform = ''; }
+
+// Flash
+function flashWhite(ms=120){ flash.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.35))'; flash.style.opacity='1'; flash.style.transition='opacity '+(ms/1000)+'s ease-out'; setTimeout(()=>{ flash.style.opacity='0'; }, 30); setTimeout(()=>{ flash.style.background=''; }, ms+60); }
+
+// Surreal pops
+let surrealObjects=[];
+function spawnSurreal(){ surrealObjects.push({x: Math.random()*W, y: Math.random()*H*0.6, t:0, life:120 + Math.random()*180, id:Math.random()}); }
+
+// Time-layer snapshot queue
+let snapshots = [];
+function captureSnapshot(){ layerCtx1.clearRect(0,0,layerCanvas1.width,layerCanvas1.height); layerCtx1.drawImage(canvas,0,0); const imgData = layerCanvas1.toDataURL(); snapshots.push(imgData); if(snapshots.length>6) snapshots.shift(); }
+function renderTimeLayers(){ tl1.style.backgroundImage = snapshots[ snapshots.length-1 ] ? `url(${snapshots[snapshots.length-1]})` : 'none'; tl1.style.opacity = timewarpOn ? 0.6 : 0; tl2.style.backgroundImage = snapshots[ snapshots.length-3 ] ? `url(${snapshots[Math.max(0,snapshots.length-3)]})` : 'none'; tl2.style.opacity = timewarpOn ? 0.35 : 0; }
+
+// Main loop
+let last=performance.now(); function loop(now){ const dt = (now-last)/1000; last=now; if(!playing){ requestAnimationFrame(loop); return; }
+  // update
+  if(sensoryOn){ // spawn particles faster
+    if(Math.random()<0.8) spawnParticle(); if(Math.random()<0.03) flashWhite(120);
+  } else { if(Math.random()<0.03) spawnParticle(); }
+  updateParticles(dt); paintParticles();
+  if(surrealOn && Math.random()<0.06) spawnSurreal();
+
+  // drawing
+  ctx.clearRect(0,0,W,H);
+  const t = now/1000;
+  drawScene(t);
+  // surreal draws
+  surrealObjects.forEach((o,idx)=>{ o.t+=dt*60; ctx.save(); ctx.translate(o.x, o.y); const s = 1+Math.sin(o.t*0.1)*0.6; ctx.rotate(Math.sin(o.t*0.03)*0.2); ctx.globalAlpha = Math.max(0, Math.min(1, o.life/240)); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(-12*s,-12*s,24*s,24*s); ctx.restore(); o.life -= dt*60; }); surrealObjects = surrealObjects.filter(o=>o.life>0);
+
+  // capture snapshots slowly for time-warp
+  if(timewarpOn && Math.random()<0.15) captureSnapshot(); renderTimeLayers();
+
+  // audio
+  if(sensoryOn){ master.gain.linearRampToValueAtTime(0.8, audioCtx.currentTime+0.4); } else { master.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime+0.4); }
+
+  // shake
+  if(sensoryOn){ applyShake(8); } else if(surrealOn){ applyShake(3); } else { clearShake(); }
+
+  requestAnimationFrame(loop);
+}
+
+// Controls
+document.getElementById('mode2d').onclick = ()=>{ mode='2d'; sensoryOn=false; timewarpOn=false; surrealOn=false; alert('Chế độ 2D: pixel animation - bấm ▶ để chạy.'); };
+document.getElementById('mode4d').onclick = ()=>{ mode='4d'; alert('Chế độ 4D: bấm các nút con để bật Cảm giác / Thời-gian / Siêu-tưởng.'); };
+document.getElementById('sensory').onclick = ()=>{ sensoryOn = !sensoryOn; if(sensoryOn) { timewarpOn=false; surrealOn=false; startAmbience(); } else stopAmbience(); };
+document.getElementById('timewarp').onclick = ()=>{ timewarpOn = !timewarpOn; if(timewarpOn) { snapshots=[]; } };
+document.getElementById('surreal').onclick = ()=>{ surrealOn = !surrealOn; };
+
+document.getElementById('play').onclick = ()=>{ if(!playing){ playing=true; last=performance.now(); loop(last); } };
+document.getElementById('stop').onclick = ()=>{ playing=false; stopAmbience(); clearShake(); };
+
+document.getElementById('download').onclick = ()=>{ // simple download of this page source
+  const html = '<!doctype html>\n' + document.documentElement.outerHTML; const blob = new Blob([html], {type:'text/html'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='ebite_2d_4d.html'; a.click(); URL.revokeObjectURL(url);
+};
+
+// init small particle layer container
+particlesEl.style.position='absolute'; particlesEl.style.left='0'; particlesEl.style.top='0'; particlesEl.style.width='100%'; particlesEl.style.height='100%';
+
+// quick start sample: draw once
+drawScene(0);
+
+// Safety: no graphic/violent depiction; shark stylized and scene is playful.
+</script>
+</body>
+</html>

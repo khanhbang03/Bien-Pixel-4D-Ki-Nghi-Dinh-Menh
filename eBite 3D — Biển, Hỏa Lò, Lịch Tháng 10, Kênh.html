@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>eBite 3D — Biển, Hỏa Lò, Lịch Tháng 10, Kênh</title>
+  <style>
+    html,body{height:100%;margin:0;background:#111;overflow:hidden;font-family:Inter,system-ui,Arial}
+    #container{width:100%;height:100vh;display:block}
+    .overlay{position:absolute;left:12px;top:12px;z-index:5;color:#fff}
+    .btn{background:#fff;color:#111;padding:8px 10px;border-radius:6px;margin-right:8px;border:none;cursor:pointer;font-weight:700}
+    .label-small{background:rgba(0,0,0,.6);padding:6px 8px;border-radius:6px;font-size:13px}
+    #info{position:absolute;right:12px;top:12px;z-index:5;color:#fff;text-align:right}
+    #filmGlitch{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;mix-blend-mode:screen;display:none;z-index:6}
+    #filmGlitch .bar{height:6px;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(255,255,255,.3),rgba(255,255,255,.1));opacity:.9}
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <div class="overlay">
+    <button class="btn" id="playBtn">▶️ Chơi</button>
+    <button class="btn" id="resetBtn">🔄 Đặt lại</button>
+    <span class="label-small">eBite 3D — Three.js</span>
+  </div>
+  <div id="info">
+    <div class="label-small">Nhân vật: Nguyễn Khanh Bằng, Trần Phương Nhi, Trần Đức Mạnh, Quách Duy Trường</div>
+    <div style="height:8px"></div>
+    <div class="label-small">Kênh hiển thị: Trương Ngọc Anh Channel</div>
+  </div>
+
+  <div id="filmGlitch" aria-hidden="true">
+    <div class="bar" style="width:100%"></div>
+  </div>
+
+  <!-- Three.js + helpers -->
+  <script src="https://unpkg.com/three@0.150.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.150.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.com/three@0.150.0/examples/js/renderers/CSS2DRenderer.js"></script>
+
+  <script>
+    // Basic Three.js scene setup
+    const container = document.getElementById('container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 60, 160);
+
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // Label renderer for names
+    const labelRenderer = new THREE.CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    container.appendChild(labelRenderer.domElement);
+
+    // Controls
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(0,20,0);
+    controls.update();
+
+    // Lights
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
+    hemi.position.set(0,200,0);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(-50, 100, -50);
+    dir.castShadow = true;
+    dir.shadow.camera.left = -200;
+    dir.shadow.camera.right = 200;
+    dir.shadow.camera.top = 200;
+    dir.shadow.camera.bottom = -200;
+    scene.add(dir);
+
+    // Sea (wavy plane)
+    const seaGeo = new THREE.PlaneGeometry(600, 600, 64, 64);
+    const seaMat = new THREE.MeshStandardMaterial({color:0x1f9fe8, metalness:0.1, roughness:0.8, transparent:true, opacity:0.95});
+    const sea = new THREE.Mesh(seaGeo, seaMat);
+    sea.rotation.x = -Math.PI/2;
+    sea.position.y = 0;
+    sea.receiveShadow = true;
+    scene.add(sea);
+
+    // Sand
+    const sandGeo = new THREE.PlaneGeometry(400, 160);
+    const sandMat = new THREE.MeshStandardMaterial({color:0xf7d488, roughness:1});
+    const sand = new THREE.Mesh(sandGeo, sandMat);
+    sand.rotation.x = -Math.PI/2;
+    sand.position.set(0, -0.5, 140);
+    sand.receiveShadow = true;
+    scene.add(sand);
+
+    // Simple low-poly characters factory
+    function makeCharacter(name, colorBody, x, z){
+      const group = new THREE.Group();
+      // head
+      const head = new THREE.Mesh(new THREE.BoxGeometry(8,8,8), new THREE.MeshStandardMaterial({color:0xffddb3}));
+      head.position.y = 22;
+      // body
+      const body = new THREE.Mesh(new THREE.BoxGeometry(10,14,6), new THREE.MeshStandardMaterial({color:colorBody}));
+      body.position.y = 10;
+      // legs
+      const legL = new THREE.Mesh(new THREE.BoxGeometry(3,8,3), new THREE.MeshStandardMaterial({color:0x222222}));
+      legL.position.set(-2.5,4,0);
+      const legR = legL.clone(); legR.position.x = 2.5;
+      group.add(head, body, legL, legR);
+      group.position.set(x, 0, z);
+      group.name = name;
+
+      // name label using CSS2D
+      const div = document.createElement('div');
+      div.className = 'label';
+      div.textContent = name;
+      div.style.padding = '4px 8px';
+      div.style.background = 'rgba(0,0,0,0.6)';
+      div.style.color = '#fff';
+      div.style.fontSize = '12px';
+      div.style.borderRadius = '6px';
+      const label = new THREE.CSS2DObject(div);
+      label.position.set(0,34,0);
+      group.add(label);
+
+      group.traverse(obj=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true}});
+      scene.add(group);
+      return group;
+    }
+
+    const nb = makeCharacter('Nguyễn Khanh Bằng', 0x1e90ff, -40, 120);
+    const nhi = makeCharacter('Trần Phương Nhi', 0xff7eb9, 0, 125);
+    const manh = makeCharacter('Trần Đức Mạnh', 0xa0c4ff, 40, 120);
+    const quach = makeCharacter('Quách Duy Trường', 0x9be564, -10, 90);
+
+    // Shark (friendly silhouette)
+    const shark = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(30,10,10), new THREE.MeshStandardMaterial({color:0x444444}));
+    body.position.set(0,8,0);
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(6,12,2), new THREE.MeshStandardMaterial({color:0x222222}));
+    fin.position.set(0,16,0);
+    fin.rotation.z = Math.PI/6;
+    shark.add(body, fin);
+    shark.position.set(-200, 6, 30);
+    shark.scale.set(1.6,1.6,1.6);
+    scene.add(shark);
+
+    // Hỏa Lò prison stylized (a small block with tower and gate)
+    function makeHoaLo(){
+      const g = new THREE.Group();
+      const wallMat = new THREE.MeshStandardMaterial({color:0x8b5a3c});
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(100,30,80), wallMat);
+      wall.position.set(0,15,-220);
+      g.add(wall);
+      // gate (a darker inset)
+      const gate = new THREE.Mesh(new THREE.BoxGeometry(36,20,6), new THREE.MeshStandardMaterial({color:0x2b2b2b}));
+      gate.position.set(0,10,-160);
+      g.add(gate);
+      // small watchtower
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(12,30,12), new THREE.MeshStandardMaterial({color:0x704214}));
+      tower.position.set(-40,30,-260);
+      g.add(tower);
+      scene.add(g);
+    }
+    makeHoaLo();
+
+    // Calendar texture (October)
+    function makeCalendar(){
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,256,256);
+      ctx.fillStyle = '#222'; ctx.font = '18px sans-serif'; ctx.fillText('CALENDAR', 24, 30);
+      ctx.fillStyle = '#d33'; ctx.font = 'bold 40px sans-serif'; ctx.fillText('OCT', 24, 80);
+      // draw simple grid (days)
+      ctx.fillStyle = '#333'; ctx.font = '14px sans-serif';
+      for(let r=0;r<5;r++){
+        for(let c0=0;c0<7;c0++){
+          const val = r*7 + c0 + 1;
+          const x = 16 + c0*32;
+          const y = 110 + r*28;
+          if(val<=31){
+            if(val===10){ // highlight 10
+              ctx.fillStyle = '#ffef96';
+              ctx.fillRect(x-6,y-18,28,22);
+              ctx.fillStyle = '#d33';
+            } else ctx.fillStyle = '#222';
+            ctx.fillText(String(val), x, y);
+          }
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      const mat = new THREE.MeshBasicMaterial({map:tex});
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(28,28), mat);
+      plane.position.set(120,60,-40);
+      scene.add(plane);
+    }
+    makeCalendar();
+
+    // Channel logo (Trương Ngọc Anh Channel) as canvas texture
+    function makeChannelLogo(){
+      const c = document.createElement('canvas'); c.width=256; c.height=64;
+      const ctx = c.getContext('2d'); ctx.fillStyle='#1a1a1a'; ctx.fillRect(0,0,256,64);
+      ctx.fillStyle='#ffcc00'; ctx.font='26px sans-serif'; ctx.fillText('Trương Ngọc Anh',10,38);
+      ctx.fillStyle='#fff'; ctx.font='12px sans-serif'; ctx.fillText('Channel',10,54);
+      const tex = new THREE.CanvasTexture(c);
+      const mat = new THREE.MeshBasicMaterial({map:tex,transparent:true});
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(70,18), mat);
+      plane.position.set(110,85,110);
+      plane.rotation.y = -0.7;
+      scene.add(plane);
+    }
+    makeChannelLogo();
+
+    // Simple animation state
+    let t = 0;
+    const clock = new THREE.Clock();
+
+    // play sequence: shark swims, camera zooms to each char, glitch overlay
+    let playing = false;
+    const playBtn = document.getElementById('playBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const filmGlitch = document.getElementById('filmGlitch');
+
+    function playSequence(){
+      if(playing) return; playing = true;
+      // timeline via setTimeouts
+      // 1. Shark rush-in animation (we'll animate in render loop)
+      shark.userData.play = true; shark.userData.phase = 0;
+
+      // 2. After 2s, camera fly to Quách Duy Trường
+      setTimeout(()=>{
+        // camera target animation
+        animateCameraTo(new THREE.Vector3(quach.position.x, 20, quach.position.z+40), 1200);
+      }, 2000);
+
+      // 3. After 4s, glitch and show film overlay
+      setTimeout(()=>{ showGlitch(1200); }, 4200);
+
+      // 4. After 6.5s, fly camera to Hỏa Lò (prison)
+      setTimeout(()=>{ animateCameraTo(new THREE.Vector3(0,60,-200), 1400); }, 6500);
+
+      // 5. After 9s, return camera to default
+      setTimeout(()=>{ animateCameraTo(new THREE.Vector3(0,60,160), 1200); playing=false; }, 9000);
+    }
+
+    function resetScene(){
+      shark.position.set(-200,6,30); shark.userData.play=false;
+      camera.position.set(0,60,160); controls.target.set(0,20,0); controls.update();
+      filmGlitch.style.display='none';
+    }
+
+    playBtn.onclick = playSequence;
+    resetBtn.onclick = resetScene;
+
+    // camera tween helper (simple linear easing)
+    function animateCameraTo(targetPos, duration=1000){
+      const from = camera.position.clone();
+      const to = targetPos.clone();
+      const start = performance.now();
+      function step(now){
+        const p = Math.min(1,(now-start)/duration);
+        camera.position.lerpVectors(from,to,p);
+        controls.update();
+        if(p<1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    // film glitch show
+    function showGlitch(ms=1000){
+      filmGlitch.style.display='block';
+      setTimeout(()=>{ filmGlitch.style.display='none'; }, ms);
+    }
+
+    // Resize handling
+    window.addEventListener('resize', ()=>{
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Render loop
+    function render(){
+      const dt = clock.getDelta(); t += dt;
+      // animate sea vertices (simple wave)
+      sea.geometry.attributes.position.array.forEach((v,i)=>{});
+      for(let i=0;i<sea.geometry.attributes.position.count;i++){
+        const y = Math.sin(i*0.12 + t*2.0) * 1.2;
+        sea.geometry.attributes.position.setY(i, y);
+      }
+      sea.geometry.attributes.position.needsUpdate = true;
+      sea.geometry.computeVertexNormals();
+
+      // Shark swim animation when playing
+      if(shark.userData.play){
+        shark.position.x += 4.0; // swim speed
+        shark.position.y = 6 + Math.sin(t*8)*1.2;
+        shark.rotation.y = Math.sin(t*2)*0.05;
+        if(shark.position.x > 260){ shark.position.x = -260; /* loop */ }
+      } else {
+        // idle slow bob
+        shark.position.y = 6 + Math.sin(t*1.2)*0.6;
+      }
+
+      // subtle bob for characters
+      [nb,nhi,manh,quach].forEach((c, idx)=>{ c.position.y = Math.sin(t*2 + idx)*0.6; });
+
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+      requestAnimationFrame(render);
+    }
+    render();
+
+    // Safety note: no graphic content, shark is stylized friendly silhouette.
+  </script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>eBite: Biển — Sự cố "hỏng phim"</title>
+  <style>
+    /* Reset */
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;font-family:Inter,system-ui,Arial;background:#7ec8e3}
+
+    /* Stage */
+    .stage{position:relative;width:100%;max-width:900px;height:560px;margin:30px auto;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.25);background:linear-gradient(#7ec8e3,#bfe8ff)}
+
+    /* Sun + sky */
+    .sun{position:absolute;right:40px;top:30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff8b8,#ffd24d);filter:blur(.5px)}
+
+    /* Sea */
+    .sea{position:absolute;left:0;right:0;bottom:0;height:45%;background:linear-gradient(#2aa0d8,#056b9a);transform:translateY(18%)}
+    .wave{position:absolute;left:-10%;right:-10%;bottom:22%;height:60px;background:rgba(255,255,255,0.06);border-radius:50%;animation:waveMove 6s linear infinite}
+    .wave.w2{bottom:18%;opacity:.08;animation-duration:8s}
+    @keyframes waveMove{0%{transform:translateX(-10%)}100%{transform:translateX(110%)}}
+
+    /* Sand */
+    .sand{position:absolute;left:0;right:0;bottom:0;height:20%;background:linear-gradient(#fff3c9,#f0d9a0);display:flex;align-items:center;justify-content:center}
+
+    /* Character (Nguyen Khanh Bang) - simple sprite */
+    .character{position:absolute;left:18%;bottom:18%;width:72px;height:130px;display:flex;flex-direction:column;align-items:center}
+    .char-head{width:48px;height:48px;border-radius:50%;background:#ffddb3;border:4px solid #d39b6a}
+    .char-body{width:54px;height:70px;background:#1e90ff;border-radius:12px;margin-top:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+    .char-label{position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);font-size:12px;color:#333}
+
+    /* Shark silhouette */
+    .shark{position:absolute;right:-18%;top:50%;width:220px;height:80px;transform:translateY(-50%) translateX(0);opacity:0;pointer-events:none}
+    .shark .body{width:220px;height:80px;background:linear-gradient(#234, #122);border-radius:80px 40px 40px 80px;position:relative}
+    .shark .fin{position:absolute;left:40px;top:-34px;width:80px;height:60px;background:#122;border-radius:80px 60px 10px 10px;transform:rotate(-25deg)}
+    .shark .tail{position:absolute;right:-24px;top:12px;width:40px;height:40px;background:#122;border-radius:20px 40px 40px 20px;transform:rotate(30deg)}
+
+    /* Shark movement */
+    .shark.enter{animation:sharkSwim 2.6s cubic-bezier(.2,.9,.1,1) forwards}
+    @keyframes sharkSwim{
+      0%{right:-18%;opacity:0;transform:translateY(-50%) scaleX(1)}
+      20%{opacity:1}
+      70%{right:22%;transform:translateY(-50%) scaleX(1)}
+      100%{right:10%;transform:translateY(-50%) scaleX(-1);opacity:0}
+    }
+
+    /* Camera reaction (shake + zoom) */
+    .shake{animation:camShake .9s ease-out}
+    @keyframes camShake{
+      0%{transform:translateY(0) scale(1)}
+      10%{transform:translate(-6px,-6px) scale(1.02)}
+      30%{transform:translate(6px,6px) scale(1.03)}
+      60%{transform:translate(-3px,3px) scale(1.015)}
+      100%{transform:translate(0) scale(1)}
+    }
+
+    /* Quick cut overlay to imply bite without graphic detail */
+    .cut{position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;opacity:0;pointer-events:none}
+    .cut.show{animation:cutFlash .9s linear forwards}
+    @keyframes cutFlash{0%{opacity:0}20%{opacity:1}60%{opacity:1}100%{opacity:0}}
+
+    /* Film damage / glitch overlay */
+    .glitch{position:absolute;left:0;right:0;top:0;bottom:0;pointer-events:none;mix-blend-mode:screen}
+    .scanlines{background:repeating-linear-gradient(180deg, rgba(0,0,0,.02), rgba(0,0,0,.02) 2px, transparent 2px, transparent 4px);opacity:.6;height:100%}
+    .glitchEffect{position:absolute;left:0;top:0;right:0;height:100%;opacity:0;display:flex;align-items:flex-start;justify-content:center}
+    .glitchEffect.show{animation:glitchOn 1.2s steps(6) forwards}
+    @keyframes glitchOn{0%{opacity:.0;filter:none}30%{opacity:1;transform:translateX(-6px) skewX(-2deg)}50%{transform:translateX(6px) skewX(2deg)}70%{transform:translateX(-3px) skewX(-1deg)}100%{opacity:1;transform:none}}
+    .glitchBar{width:100%;height:8px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);mix-blend-mode:overlay}
+
+    /* VHS-stutter text */
+    .filmText{position:absolute;left:16px;bottom:14px;font-weight:700;font-size:14px;color:#222;background:rgba(255,255,255,.85);padding:6px 10px;border-radius:6px;opacity:0}
+    .filmText.show{animation:filmTextOn .9s ease-out forwards}
+    @keyframes filmTextOn{0%{opacity:0}60%{opacity:1}100%{opacity:1}}
+
+    /* Controls */
+    .controls{display:flex;gap:8px;position:absolute;left:12px;top:12px}
+    .btn{background:#fff;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+
+    /* small responsive */
+    @media (max-width:520px){.stage{height:420px}}
+  </style>
+</head>
+<body>
+  <div style="text-align:center;font-size:18px;color:#052437;margin-top:8px">eBite: Mô phỏng (không đồ họa) — Biển & 'hỏng phim'</div>
+
+  <div class="stage" id="stage">
+    <div class="sun"></div>
+
+    <div class="sea">
+      <div class="wave w1"></div>
+      <div class="wave w2"></div>
+    </div>
+
+    <div class="sand"></div>
+
+    <!-- Characters -->
+    <!-- Three characters on the beach -->
+    <div class="character" id="char1" style="left:12%;bottom:18%">
+      <div class="char-head" id="charHead1"></div>
+      <div class="char-body">NB</div>
+      <div class="char-label">Nguyễn Khanh Bằng</div>
+    </div>
+
+    <div class="character" id="char2" style="left:30%;bottom:18%">
+      <div class="char-head" id="charHead2"></div>
+      <div class="char-body">TPN</div>
+      <div class="char-label">Trần Phương Nhi</div>
+    </div>
+
+    <div class="character" id="char3" style="left:46%;bottom:18%">
+      <div class="char-head" id="charHead3"></div>
+      <div class="char-body">TDM</div>
+      <div class="char-label">Trần Đức Mạnh</div>
+    </div>
+
+    <!-- Shark (silhouette) --> (silhouette) -->
+    <div class="shark" id="shark" aria-hidden="true">
+      <div class="body"></div>
+      <div class="fin"></div>
+      <div class="tail"></div>
+    </div>
+
+    <!-- Quick cut overlay to imply incident (no gore) -->
+    <div class="cut" id="cut">...SỰ CỐ — MÁY QUAY BỊ GIẬT...</div>
+
+    <!-- Glitch / film damage overlay -->
+    <div class="glitch" id="glitch">
+      <div class="scanlines"></div>
+      <div class="glitchEffect" id="glitchEffect">
+        <div class="glitchBar"></div>
+      </div>
+    </div>
+
+    <div class="filmText" id="filmText">FILM: HỎNG — DỮ LIỆU BỊ MẤT</div>
+
+    <div class="controls">
+      <div class="btn" id="playBtn">Phát eBite</div>
+      <div class="btn" id="resetBtn">Đặt lại</div>
+    </div>
+  </div>
+
+  <script>
+    // Ghi chú: để tránh mô tả bạo lực đồ họa, cảnh chỉ "ngụ ý" sự cố:
+    // - Cá mập là bóng (silhouette). Không có máu hay chi tiết thương tích.
+    // - Có cắt nhanh (cut) và lỗi phim để thể hiện 'hỏng phim'.
+
+    const shark = document.getElementById('shark');
+    const cut = document.getElementById('cut');
+    const glitchEffect = document.getElementById('glitchEffect');
+    const filmText = document.getElementById('filmText');
+    const stage = document.getElementById('stage');
+    const playBtn = document.getElementById('playBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    function playSequence(){
+      // 1) Shark swims in
+      shark.classList.remove('enter');
+      void shark.offsetWidth; // force reflow
+      shark.classList.add('enter');
+
+      // 2) after short delay, trigger camera shake + quick cut
+      setTimeout(()=>{
+        stage.classList.add('shake');
+        cut.classList.add('show');
+      }, 1300);
+
+      // 3) after cut, show glitch / film damage
+      setTimeout(()=>{
+        glitchEffect.classList.add('show');
+        filmText.classList.add('show');
+      }, 1700);
+
+      // 4) sustain glitch then fade out
+      setTimeout(()=>{
+        glitchEffect.classList.remove('show');
+        filmText.classList.remove('show');
+      }, 3700);
+
+      // remove shake after
+      setTimeout(()=>{stage.classList.remove('shake');cut.classList.remove('show');}, 2100);
+    }
+
+    playBtn.addEventListener('click', playSequence);
+    resetBtn.addEventListener('click', ()=>{
+      // reset visual states
+      shark.classList.remove('enter');
+      stage.classList.remove('shake');
+      cut.classList.remove('show');
+      glitchEffect.classList.remove('show');
+      filmText.classList.remove('show');
+    });
+
+    // auto-play first time for convenience
+    window.addEventListener('load', ()=>{ /* no autoplay to respect user agent policies */ });
+
+    // Optional: change character label easily
+    // document.querySelector('.char-label').textContent = 'Tên khác nếu muốn';
+  </script>
+</body>
+</html>
